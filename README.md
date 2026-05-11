@@ -1,176 +1,376 @@
-<p align="center">
-  <img alt="LeRobot, Hugging Face Robotics Library" src="./media/readme/lerobot-logo-thumbnail.png" width="100%">
-</p>
+# HIL-SERL 仿真实验使用指南
 
-<div align="center">
+> 框架：`gym_hil` 仿真环境 + SAC 策略 + LeRobot 工具链
 
-[![Tests](https://github.com/huggingface/lerobot/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/huggingface/lerobot/actions/workflows/nightly.yml?query=branch%3Amain)
-[![Python versions](https://img.shields.io/pypi/pyversions/lerobot)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/huggingface/lerobot/blob/main/LICENSE)
-[![Status](https://img.shields.io/pypi/status/lerobot)](https://pypi.org/project/lerobot/)
-[![Version](https://img.shields.io/pypi/v/lerobot)](https://pypi.org/project/lerobot/)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.1-ff69b4.svg)](https://github.com/huggingface/lerobot/blob/main/CODE_OF_CONDUCT.md)
-[![Discord](https://img.shields.io/badge/Discord-Join_Us-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/q8Dzzpym3f)
+由于此实验环境在官方的基础上做了更改，在开始前我们需要替换用pip下载下来的gym_hil文件夹。详情请参见gym_hil文件夹下的readme.md文档
+---
 
-</div>
-
-**LeRobot** aims to provide models, datasets, and tools for real-world robotics in PyTorch. The goal is to lower the barrier to entry so that everyone can contribute to and benefit from shared datasets and pretrained models.
-
-🤗 A hardware-agnostic, Python-native interface that standardizes control across diverse platforms, from low-cost arms (SO-100) to humanoids.
-
-🤗 A standardized, scalable LeRobotDataset format (Parquet + MP4 or images) hosted on the Hugging Face Hub, enabling efficient storage, streaming and visualization of massive robotic datasets.
-
-🤗 State-of-the-art policies that have been shown to transfer to the real-world ready for training and deployment.
-
-🤗 Comprehensive support for the open-source ecosystem to democratize physical AI.
-
-## Quick Start
-
-LeRobot can be installed directly from PyPI.
+## 快速开始
 
 ```bash
-pip install lerobot
-lerobot-info
+conda activate lerobot
+cd /home/zhu/lerobot-main/lerobot-main
 ```
 
-> [!IMPORTANT]
-> For detailed installation guide, please see the [Installation Documentation](https://huggingface.co/docs/lerobot/installation).
+---
 
-## Robots & Control
+## 配置文件总览
 
-<div align="center">
-  <img src="./media/readme/robots_control_video.webp" width="640px" alt="Reachy 2 Demo">
-</div>
+| 文件 | 用途 |
+|------|------|
+| `src/lerobot/rl/hil_sim_config.json` | 观察环境 / 录制演示数据 |
+| `src/lerobot/rl/hil_sim_train_config.json` | SAC 强化学习训练 |
+| `src/lerobot/rl/hil_sim_eval_config.json` | 评估已训练的模型 |
 
-LeRobot provides a unified `Robot` class interface that decouples control logic from hardware specifics. It supports a wide range of robots and teleoperation devices.
+---
 
-```python
-from lerobot.robots.myrobot import MyRobot
+## 1. 基本使用模式
 
-# Connect to a robot
-robot = MyRobot(config=...)
-robot.connect()
+打开仿真窗口，用键盘手动控制机器人，或回放已录制的演示轨迹。
 
-# Read observation and send action
-obs = robot.get_observation()
-action = model.select_action(obs)
-robot.send_action(action)
-```
+**配置文件：** `hil_sim_config.json`
 
-**Supported Hardware:** SO100, LeKiwi, Koch, HopeJR, OMX, EarthRover, Reachy2, Gamepads, Keyboards, Phones, OpenARM, Unitree G1.
-
-While these devices are natively integrated into the LeRobot codebase, the library is designed to be extensible. You can easily implement the Robot interface to utilize LeRobot's data collection, training, and visualization tools for your own custom robot.
-
-For detailed hardware setup guides, see the [Hardware Documentation](https://huggingface.co/docs/lerobot/integrate_hardware).
-
-## LeRobot Dataset
-
-To solve the data fragmentation problem in robotics, we utilize the **LeRobotDataset** format.
-
-- **Structure:** Synchronized MP4 videos (or images) for vision and Parquet files for state/action data.
-- **HF Hub Integration:** Explore thousands of robotics datasets on the [Hugging Face Hub](https://huggingface.co/lerobot).
-- **Tools:** Seamlessly delete episodes, split by indices/fractions, add/remove features, and merge multiple datasets.
-
-```python
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
-
-# Load a dataset from the Hub
-dataset = LeRobotDataset("lerobot/aloha_mobile_cabinet")
-
-# Access data (automatically handles video decoding)
-episode_index=0
-print(f"{dataset[episode_index]['action'].shape=}\n")
-```
-
-Learn more about it in the [LeRobotDataset Documentation](https://huggingface.co/docs/lerobot/lerobot-dataset-v3)
-
-## SoTA Models
-
-LeRobot implements state-of-the-art policies in pure PyTorch, covering Imitation Learning, Reinforcement Learning, and Vision-Language-Action (VLA) models, with more coming soon. It also provides you with the tools to instrument and inspect your training process.
-
-<p align="center">
-  <img alt="Gr00t Architecture" src="./media/readme/VLA_architecture.jpg" width="640px">
-</p>
-
-Training a policy is as simple as running a script configuration:
+| 字段 | 说明 |
+|------|------|
+| `mode` | `null`=仅观察，`"record"`=录制，`"replay"`=回放 |
+| `env.task` | Gym 注册任务名，切换任务时修改 |
+| `env.processor.reset.fixed_reset_joint_positions` | 复位关节角（7个弧度值） |
+| `env.processor.reset.control_time_s` | 每个 episode 最大时长（秒） |
+| `dataset.replay_episode` | 回放模式下指定回放的轨迹编号（从0计） |
 
 ```bash
-lerobot-train \
-  --policy=act \
-  --dataset.repo_id=lerobot/aloha_mobile_cabinet
+python -m lerobot.rl.gym_manipulator \
+    --config_path src/lerobot/rl/hil_sim_config.json
 ```
 
-| Category                   | Models                                                                                                                                                                                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Imitation Learning**     | [ACT](./docs/source/policy_act_README.md), [Diffusion](./docs/source/policy_diffusion_README.md), [VQ-BeT](./docs/source/policy_vqbet_README.md)                                                             |
-| **Reinforcement Learning** | [HIL-SERL](./docs/source/hilserl.mdx), [TDMPC](./docs/source/policy_tdmpc_README.md) & QC-FQL (coming soon)                                                                                                  |
-| **VLAs Models**            | [Pi0Fast](./docs/source/pi0fast.mdx), [Pi0.5](./docs/source/pi05.mdx), [GR00T N1.5](./docs/source/policy_groot_README.md), [SmolVLA](./docs/source/policy_smolvla_README.md), [XVLA](./docs/source/xvla.mdx) |
+**键盘控制：** 方向键=XY移动，Shift=Z升降，Ctrl=夹爪，Enter=成功，Backspace=失败，Space=干预开关，ESC=退出
 
-Similarly to the hardware, you can easily implement your own policy & leverage LeRobot's data collection, training, and visualization tools, and share your model to the HF Hub
+---
 
-For detailed policy setup guides, see the [Policy Documentation](https://huggingface.co/docs/lerobot/bring_your_own_policies).
+## 2. 录制模式
 
-## Inference & Evaluation
+采集人工示教演示轨迹，用作 SAC 离线缓冲区的初始数据。建议录制 20-50 条。
 
-Evaluate your policies in simulation or on real hardware using the unified evaluation script. LeRobot supports standard benchmarks like **LIBERO**, **MetaWorld** and more to come.
+**配置文件：** `hil_sim_config.json`
+
+| 字段 | 说明 |
+|------|------|
+| `mode` | 改为 `"record"`（**必改**） |
+| `dataset.repo_id` | 数据集名称，需与训练配置保持一致，如 `"franka_sim_task_v1"` |
+| `dataset.root` | 本地保存路径，默认 `"data"` |
+| `dataset.num_episodes_to_record` | 计划录制的 episode 总数 |
 
 ```bash
-# Evaluate a policy on the LIBERO benchmark
-lerobot-eval \
-  --policy.path=lerobot/pi0_libero_finetuned \
-  --env.type=libero \
-  --env.task=libero_object \
-  --eval.n_episodes=10
+python -m lerobot.rl.gym_manipulator \
+    --config_path src/lerobot/rl/hil_sim_config.json
 ```
 
-Learn how to implement your own simulation environment or benchmark and distribute it from the HF Hub by following the [EnvHub Documentation](https://huggingface.co/docs/lerobot/envhub)
+录制完成后，读取统计数据（填写训练配置时需要）：
 
-## Resources
+```bash
+python -c "
+import json
+with open('data/meta/stats.json') as f:
+    s = json.load(f)
+print('action  min:', s['action']['min'])
+print('action  max:', s['action']['max'])
+print('state   min:', s['observation.state']['min'])
+print('state   max:', s['observation.state']['max'])
+"
+```
 
-- **[Documentation](https://huggingface.co/docs/lerobot/index):** The complete guide to tutorials & API.
-- **[Chinese Tutorials: LeRobot+SO-ARM101中文教程-同济子豪兄](https://zihao-ai.feishu.cn/wiki/space/7589642043471924447)** Detailed doc for assembling, teleoperate, dataset, train, deploy. Verified by Seed Studio and 5 global hackathon players.
-- **[Discord](https://discord.gg/q8Dzzpym3f):** Join the `LeRobot` server to discuss with the community.
-- **[X](https://x.com/LeRobotHF):** Follow us on X to stay up-to-date with the latest developments.
-- **[Robot Learning Tutorial](https://huggingface.co/spaces/lerobot/robot-learning-tutorial):** A free, hands-on course to learn robot learning using LeRobot.
+---
 
-## Citation
+## 3. 训练模式
 
-If you use LeRobot in your project, please cite the GitHub repository to acknowledge the ongoing development and contributors:
+SAC 训练需要两个进程：**Learner**（主进程，核心训练）和 **Actor**（运行环境，在线交互）。
 
-```bibtex
-@misc{cadene2024lerobot,
-    author = {Cadene, Remi and Alibert, Simon and Soare, Alexander and Gallouedec, Quentin and Zouitine, Adil and Palma, Steven and Kooijmans, Pepijn and Aractingi, Michel and Shukor, Mustafa and Aubakirova, Dana and Russi, Martino and Capuano, Francesco and Pascal, Caroline and Choghari, Jade and Moss, Jess and Wolf, Thomas},
-    title = {LeRobot: State-of-the-art Machine Learning for Real-World Robotics in Pytorch},
-    howpublished = "\url{https://github.com/huggingface/lerobot}",
-    year = {2024}
+**配置文件：** `hil_sim_train_config.json`
+
+| 字段 | 说明 |
+|------|------|
+| `output_dir` / `job_name` | 输出目录与实验名，建议含任务名称 |
+| `steps` / `save_freq` | 总训练步数 / checkpoint 保存间隔 |
+| `wandb.enable` / `wandb.project` | 是否启用 wandb 及项目名 |
+| `dataset.repo_id` | **必须**与录制时一致 |
+| `env.task` | 与录制配置一致 |
+| `env.processor.reset.*` | 与录制配置一致 |
+| `policy.dataset_stats` | ⚠️ **最重要**：填入录制数据集的真实统计量（见录制章节）。填错会导致归一化偏移，训练无法收敛 |
+| `policy.num_discrete_actions` | 离散夹爪档数，当前为 3；不用夹爪时设为 0 |
+| `policy.device` | `"cuda"` 或 `"cpu"` |
+| `policy.online_steps` / `online_buffer_capacity` / `offline_buffer_capacity` | 在线交互步数上限及缓冲区大小 |
+
+### 3.1 子集训练（内存不够时优先用）
+
+当演示数据较多、`learner` 在离线回放或训练中后期被系统 OOM 杀死时，建议先只使用前 N 条 episode 训练。
+
+在 `src/lerobot/rl/hil_sim_train_config.json` 的 `dataset` 下增加 `episodes` 字段：
+
+```json
+"dataset": {
+  "repo_id": "franka_sim_plug_v1",
+  "root": "data",
+  "episodes": [0, 1, 2, 3, 4],
+  "use_imagenet_stats": false
 }
 ```
 
-If you are referencing our research or the academic paper, please also cite our ICLR publication:
+常用照抄模板：
+- 前 50 条 episode：`[0, 1, 2, ..., 49]`
+- 前 60 条 episode：`[0, 1, 2, ..., 59]`
 
-<details>
-<summary><b>ICLR 2026 Paper</b></summary>
+一键生成列表（避免手写长数组）：
 
-```bibtex
-@inproceedings{cadenelerobot,
-  title={LeRobot: An Open-Source Library for End-to-End Robot Learning},
-  author={Cadene, Remi and Alibert, Simon and Capuano, Francesco and Aractingi, Michel and Zouitine, Adil and Kooijmans, Pepijn and Choghari, Jade and Russi, Martino and Pascal, Caroline and Palma, Steven and Shukor, Mustafa and Moss, Jess and Soare, Alexander and Aubakirova, Dana and Lhoest, Quentin and Gallou\'edec, Quentin and Wolf, Thomas},
-  booktitle={The Fourteenth International Conference on Learning Representations},
-  year={2026},
-  url={https://arxiv.org/abs/2602.22818}
+```bash
+# 生成前 60 条（0..59）
+python -c "import json; print(json.dumps(list(range(60))))"
+
+# 生成前 50 条（0..49）
+python -c "import json; print(json.dumps(list(range(50))))"
+```
+
+把输出结果直接粘贴到 `dataset.episodes` 即可。
+
+说明：
+- `episodes` 是 episode 索引列表（从 0 开始）。
+- 训练只会读取该列表里的轨迹，不会读取其余轨迹。
+- 子集训练时，`offline_buffer_capacity` 需要不小于该子集对应的总帧数。
+
+经验建议（16GB 内存机器，双相机视觉任务）：
+- 先用前 50~60 条 episode 启动。
+- `online_buffer_capacity` 先设 `2000~3000`。
+- `offline_buffer_capacity` 先设 `4500~6000`，再按实际子集帧数上调。
+
+### 第一次训练
+
+**终端1 — 启动 Learner：**
+```bash
+cd /home/zhu/lerobot-main/lerobot-main
+conda activate lerobot
+RUN_DIR="output/franka_sim_$(date +%Y%m%d_%H%M%S)"
+echo "$RUN_DIR" > .last_run_dir
+PYTHONPATH=src python -m lerobot.rl.learner --config_path=src/lerobot/rl/hil_sim_train_config.json --output_dir="$RUN_DIR"
+```
+
+**终端2 — 启动 Actor（等 Learner 初始化完毕后再运行）：**
+```bash
+cd /home/zhu/lerobot-main/lerobot-main
+conda activate lerobot
+RUN_DIR="$(cat .last_run_dir)"
+PYTHONPATH=src python -m lerobot.rl.actor --config_path=src/lerobot/rl/hil_sim_train_config.json --output_dir="${RUN_DIR}_actor"
+```
+
+**训练输出结构：**
+```
+output/<实验名>_<时间戳>/
+├── checkpoints/
+│   ├── last -> 0010000/            # 最新 checkpoint 的符号链接
+│   ├── 0005000/pretrained_model/   # 可用于推理的模型文件
+│   └── 0010000/pretrained_model/
+├── dataset/                        # 在线缓冲区快照（评估不需要）
+├── dataset_offline/                # 离线缓冲区快照（评估不需要）
+└── logs/
+```
+
+### 断点续训
+
+修改 `hil_sim_train_config.json`：
+```json
+{
+  "resume": true,
+  "output_dir": "output/franka_unplug_sac"
 }
 ```
 
-</details>
+单一终端运行以启用自动 Actor：
+```bash
+python -m lerobot.rl.learner \
+    --config_path src/lerobot/rl/hil_sim_train_config.json
+```
 
-## Contribute
+---
 
-We welcome contributions from everyone in the community! To get started, please read our [CONTRIBUTING.md](https://github.com/huggingface/lerobot/blob/main/CONTRIBUTING.md) guide. Whether you're adding a new feature, improving documentation, or fixing a bug, your help and feedback are invaluable. We're incredibly excited about the future of open-source robotics and can't wait to work with you on what's next—thank you for your support!
+## 4. 评估模式
 
-<p align="center">
-  <img alt="SO101 Video" src="./media/readme/so100_video.webp" width="640px">
-</p>
+加载训练好的 checkpoint，纯策略推理（无人工干预），输出成功率和步数统计表格。
 
-<div align="center">
-<sub>Built by the <a href="https://huggingface.co/lerobot">LeRobot</a> team at <a href="https://huggingface.co">Hugging Face</a> with ❤️</sub>
-</div>
+**配置文件：** `hil_sim_eval_config.json`
+
+| 字段 | 说明 |
+|------|------|
+| `policy.pretrained_path` | ⚠️ **必改**。指向 `pretrained_model/` 目录 |
+| `env.task` / `env.processor.reset.*` | 与训练配置保持一致 |
+| `policy.dataset_stats` | 与训练配置保持一致 |
+
+**评估脚本：** `src/lerobot/rl/eval_hil_sim.py`
+
+| 代码位置 | 说明 |
+|----------|------|
+| `N_EVAL_EPISODES = 20` | 评估 episode 总数，按需修改 |
+| `"SUCCESS" if r > 0` | 成功判定阈值，与任务 reward 设计保持一致（共 2 处） |
+
+```bash
+python -m lerobot.rl.eval_hil_sim \
+    --config_path src/lerobot/rl/hil_sim_eval_config.json
+```
+
+一次性依次评估所有模型用这个命令
+```bash
+cd /home/zhu/lerobot-main/lerobot-main
+conda activate lerobot
+python -m lerobot.rl.eval_all_checkpoints \
+  --run_dir output/franka_sim_XXX（你自己的模型路径） \
+  --eval_config src/lerobot/rl/hil_sim_eval_config.json
+```
+如果你想“遇到一个失败就立即停”，加这个参数：
+--stop_on_error
+---
+
+## 5. 步长与步数限制调参（插插头必看）
+
+插插头任务对精度敏感，建议把“控制步长”和“每回合步数上限”分开管理。
+
+### 5.1 键盘/手柄步长在哪里改
+
+- 文件：`gym_hil/wrappers/factory.py`
+- 默认输入步长倍率：`DEFAULT_INPUTS_CONTROL_STEP_SIZE = {"x": 0.1, "y": 0.2, "z": 0.3}`
+- 作用：缩放人工输入（键盘/手柄）位移增量。
+
+说明：
+- 倍率越小，单次按键移动越短，更适合精细插入。
+- 倍率越大，移动更快，适合粗定位。
+
+补充：
+- 末端基础步长在 `gym_hil/wrappers/hil_wrappers.py` 的 `DEFAULT_EE_STEP_SIZE`（当前 0.025m）。
+- 近似单次按键位移：`DEFAULT_EE_STEP_SIZE * DEFAULT_INPUTS_CONTROL_STEP_SIZE`。
+  - 例如当前约为：
+    - X 方向：`0.025 * 0.1 = 0.0025m`（2.5mm）
+    - Y 方向：`0.025 * 0.2 = 0.0050m`（5.0mm）
+    - Z 方向：`0.025 * 0.3 = 0.0075m`（7.5mm）
+
+### 5.1.1 运行前自检：确认到底加载了哪个 `gym_hil`
+
+很多“改了步长但体感没变化”的问题，根因是运行时加载了另一个环境里的 `gym_hil`。
+
+请在训练/测试前执行：
+
+```bash
+conda run -n lerobot python -c "import gym_hil; from gym_hil.wrappers import factory; print('gym_hil file:', gym_hil.__file__); print('factory file:', factory.__file__); print('DEFAULT_INPUTS_CONTROL_STEP_SIZE =', factory.DEFAULT_INPUTS_CONTROL_STEP_SIZE); print('DEFAULT_EE_STEP_SIZE =', factory.DEFAULT_EE_STEP_SIZE)"
+```
+
+判定标准：
+- `gym_hil file` 和 `factory file` 应该都指向当前工作区路径，例如 `/home/zhu/lerobot-main/lerobot-main/gym_hil/...`
+- 输出的 `DEFAULT_INPUTS_CONTROL_STEP_SIZE` 必须与你刚修改的值一致
+
+若路径不在工作区：
+- 说明当前 Python 环境优先加载了 site-packages 的副本
+- 需要先切到正确环境，或调整 `PYTHONPATH`/安装方式后再运行
+
+### 5.2 每个 episode 最大步数在哪里改
+
+`gym_manipulator` 实际生效上限是两层共同决定：
+
+- 时间层（处理器）：`int(control_time_s * fps)`
+  - 配置文件：
+    - `src/lerobot/rl/hil_sim_config.json`
+    - `src/lerobot/rl/hil_sim_train_config.json`
+    - `src/lerobot/rl/hil_sim_eval_config.json`
+  - 字段：`env.processor.reset.control_time_s` 和 `env.fps`
+
+- Gym 注册层：`max_episode_steps`
+  - 文件：`gym_hil/__init__.py`
+  - 当前通过环境变量统一控制：
+    - `MAX_EPISODE_STEPS = int(os.getenv("GYM_HIL_MAX_EPISODE_STEPS", "200"))`
+
+最终有效步数：
+
+```text
+effective_episode_steps = min(max_episode_steps, int(control_time_s * fps))
+```
+
+示例（当前推荐）：
+- `fps=10`
+- `control_time_s=20`
+- `GYM_HIL_MAX_EPISODE_STEPS=200`
+- 有效上限 = `min(200, 200) = 200` 步。
+
+临时改步数上限（不改代码）：
+
+```bash
+GYM_HIL_MAX_EPISODE_STEPS=240 python -m lerobot.rl.gym_manipulator \
+  --config_path src/lerobot/rl/hil_sim_config.json
+```
+
+---
+
+## 6. 新任务切换检查清单
+
+### Step 1 — 修改仿真环境
+
+- [ ] 修改 `scene.xml`：添加新任务物体模型和传感器
+- [ ] 修改 `panda_pick_gym_env.py`：更新 `_is_success()`、`_compute_reward()`，确保 `_is_success()` 在 `step()` 中只调用一次
+- [ ] 将修改后的文件复制到 site-packages：
+  ```bash
+  SITE=~/.../envs/lerobot/lib/python3.12/site-packages/gym_hil
+  cp panda_pick_gym_env.py $SITE/envs/
+  cp scene.xml $SITE/assets/
+  ```
+
+### Step 2 — 更新 `hil_sim_config.json`
+
+- [ ] `mode` → `"record"`
+- [ ] `env.task` → 新任务注册名
+- [ ] `env.processor.reset.*` → 新复位姿态和时限（重点：`control_time_s`）
+- [ ] `dataset.repo_id` → 新数据集名称
+- [ ] 必要时同步调整 `env.fps`（会直接影响每回合最大步数）
+
+### Step 2.5 — 调整控制步长与步数上限
+
+- [ ] `gym_hil/wrappers/factory.py`：按任务精度调整 `DEFAULT_INPUTS_CONTROL_STEP_SIZE`
+- [ ] `gym_hil/__init__.py`：确认 `GYM_HIL_MAX_EPISODE_STEPS` 默认值是否合适
+- [ ] 三份配置文件中统一 `control_time_s`，避免训练/评估口径不一致
+
+### Step 3 — 录制演示数据，记录 stats
+
+- [ ] 运行录制命令
+- [ ] 从 `data/meta/stats.json` 记录 action / state 的 min / max
+
+### Step 4 — 更新 `hil_sim_train_config.json`
+
+- [ ] `output_dir` / `job_name` → 新实验名
+- [ ] `dataset.repo_id` → 与 Step 2 一致
+- [ ] `env.task` / `env.processor.reset.*` → 同上
+- [ ] `policy.dataset_stats` → 填入 Step 3 的真实统计量
+- [ ] `policy.input_features` / `output_features` → 如特征维度有变化需修改
+
+### Step 5 — 训练
+
+- [ ] 运行训练命令，记录 checkpoint 路径
+
+### Step 6 — 更新 `hil_sim_eval_config.json`
+
+- [ ] `policy.pretrained_path` → Step 5 的 checkpoint 路径
+- [ ] `env.task` / `policy.dataset_stats` → 与训练配置一致
+
+### Step 7 — 评估
+
+- [ ] 运行评估命令
+
+---
+
+## 附录：关键文件路径
+
+| 类型 | 路径 |
+|------|------|
+| 录制配置 | `src/lerobot/rl/hil_sim_config.json` |
+| 训练配置 | `src/lerobot/rl/hil_sim_train_config.json` |
+| 评估配置 | `src/lerobot/rl/hil_sim_eval_config.json` |
+| 评估脚本 | `src/lerobot/rl/eval_hil_sim.py` |
+| 视觉编码器 | `src/lerobot/model/resnet10/` |
+| 演示数据集 | `data/` |
+| 训练输出 | `output/` |
+| gym_hil 环境类 | `~/.../site-packages/gym_hil/envs/panda_pick_gym_env.py` |
+| gym_hil 场景文件 | `~/.../site-packages/gym_hil/assets/scene.xml` |
+| 步长配置（输入控制） | `gym_hil/wrappers/factory.py` |
+| 步长配置（EE基础步长） | `gym_hil/wrappers/hil_wrappers.py` |
+| Gym 步数上限配置 | `gym_hil/__init__.py` |
