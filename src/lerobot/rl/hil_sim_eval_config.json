@@ -1,0 +1,227 @@
+{
+    "env": {
+        "type": "gym_manipulator",
+        "name": "gym_hil",
+        "task": "PandaPickCubeKeyboard-v0",
+        "fps": 10,
+        "robot": null,
+        "teleop": null,
+        "processor": {
+            "control_mode": "keyboard",
+            "gripper": {
+                "use_gripper": true,
+                "gripper_penalty": -0.02
+            },
+            "reset": {
+                "fixed_reset_joint_positions": [
+                    0.0,
+                    0.195,
+                    0.0,
+                    -2.43,
+                    0.0,
+                    2.62,
+                    0.785
+                ],
+                "reset_time_s": 2.0,
+                "control_time_s": 15.0,
+                "terminate_on_success": true
+            }
+        },
+        "features": {
+            "observation.images.front": {
+                "type": "VISUAL",
+                "shape": [
+                    3,
+                    128,
+                    128
+                ]
+            },
+            "observation.images.wrist": {
+                "type": "VISUAL",
+                "shape": [
+                    3,
+                    128,
+                    128
+                ]
+            },
+            "observation.state": {
+                "type": "STATE",
+                "shape": [
+                    18
+                ]
+            },
+            "action": {
+                "type": "ACTION",
+                "shape": [
+                    3
+                ]
+            }
+        },
+        "features_map": {
+            "observation.images.front": "observation.images.front",
+            "observation.images.wrist": "observation.images.wrist",
+            "observation.state": "observation.state",
+            "action": "action"
+        }
+    },
+    "policy": {
+        "type": "sac",
+        "n_obs_steps": 1,
+        "normalization_mapping": {
+            "VISUAL": "MEAN_STD",
+            "STATE": "MIN_MAX",
+            "ENV": "MIN_MAX",
+            "ACTION": "MIN_MAX"
+        },
+        "input_features": {
+            "observation.images.front": {
+                "type": "VISUAL",
+                "shape": [
+                    3,
+                    128,
+                    128
+                ]
+            },
+            "observation.images.wrist": {
+                "type": "VISUAL",
+                "shape": [
+                    3,
+                    128,
+                    128
+                ]
+            },
+            "observation.state": {
+                "type": "STATE",
+                "shape": [
+                    18
+                ]
+            }
+        },
+        "output_features": {
+            "action": {
+                "type": "ACTION",
+                "shape": [
+                    3
+                ]
+            }
+        },
+        "device": "cuda",
+        "use_amp": false,
+        "dataset_stats": {
+            "observation.images.front": {
+                "mean": [
+                    0.485,
+                    0.456,
+                    0.406
+                ],
+                "std": [
+                    0.229,
+                    0.224,
+                    0.225
+                ]
+            },
+            "observation.images.wrist": {
+                "mean": [
+                    0.485,
+                    0.456,
+                    0.406
+                ],
+                "std": [
+                    0.229,
+                    0.224,
+                    0.225
+                ]
+            },
+            "observation.state": {
+                "min": [
+                    -0.0007324253674596548,
+                    0.13648942112922668,
+                    -0.000663166691083461,
+                    -2.4343578815460205,
+                    -9.690420120023191e-05,
+                    2.2614095211029053,
+                    0.785107433795929,
+                    -0.001999107887968421,
+                    -0.37040409445762634,
+                    -0.002569552743807435,
+                    -0.4455212652683258,
+                    -0.002252051141113043,
+                    -0.4917386770248413,
+                    -0.0010695706587284803,
+                    0.0,
+                    0.4901769459247589,
+                    -2.224267700512428e-05,
+                    0.07757025212049484
+                ],
+                "max": [
+                    0.0006941217579878867,
+                    0.4174484610557556,
+                    0.0007225906010717154,
+                    -2.0714876651763916,
+                    0.0009729723678901792,
+                    2.6276187896728516,
+                    0.7857028245925903,
+                    0.0028880673926323652,
+                    0.4091859757900238,
+                    0.0016092918813228607,
+                    0.6580479145050049,
+                    0.002467625541612506,
+                    0.22304300963878632,
+                    0.0014421315863728523,
+                    255.0,
+                    0.5903441309928894,
+                    0.00013490811397787184,
+                    0.20368248224258423
+                ]
+            },
+            "action": {
+                "min": [
+                    -1.0,
+                    0.0,
+                    -1.0
+                ],
+                "max": [
+                    1.0,
+                    0.0,
+                    1.0
+                ]
+            }
+        },
+        "vision_encoder_name": "src/lerobot/model/resnet10",
+        "freeze_vision_encoder": true,
+        "image_encoder_hidden_dim": 32,
+        "shared_encoder": true,
+        "num_critics": 2,
+        "num_subsample_critics": null,
+        "discount": 0.97,
+        "temperature_init": 0.01,
+        "critic_target_update_weight": 0.005,
+        "state_encoder_hidden_dim": 256,
+        "latent_dim": 64,
+        "target_entropy": null,
+        "use_backup_entropy": true,
+        "num_discrete_actions": 3,
+        "critic_network_kwargs": {
+            "hidden_dims": [
+                256,
+                256
+            ],
+            "activate_final": true,
+            "final_activation": null
+        },
+        "actor_network_kwargs": {
+            "hidden_dims": [
+                256,
+                256
+            ],
+            "activate_final": true
+        },
+        "policy_kwargs": {
+            "use_tanh_squash": true,
+            "std_min": 1e-05,
+            "std_max": 5,
+            "init_final": 0.05
+        },
+        "pretrained_path": "output/franka_sim_20260320_081817/checkpoints/0010000/pretrained_model"
+    }
+}
